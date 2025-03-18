@@ -278,6 +278,11 @@ func (api *API) SearchTwitterFollowers() gin.HandlerFunc {
 			Count    int    `json:"count"`
 		}
 
+		if err := c.ShouldBindJSON(&reqBody); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
 		username := c.Param("username")
 		if username == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Username parameter is missing"})
@@ -302,6 +307,27 @@ func (api *API) SearchTwitterFollowers() gin.HandlerFunc {
 		go handleWorkResponse(c, responseCh, wg)
 
 		err = api.sendWorkRequest(requestID, data_types.TwitterFollowers, bodyBytes, wg)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+		wg.Wait()
+	}
+}
+
+// CheckTwitterAccounts returns a gin.HandlerFunc that retrieves the status of all Twitter accounts.
+//
+// Dev Notes:
+// - This function checks the status of all Twitter accounts.
+func (api *API) CheckTwitterAccounts() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		api.sendTrackingEvent(data_types.TwitterAccounts, []byte(""))
+		requestID := uuid.New().String()
+		responseCh := workers.GetResponseChannelMap().CreateChannel(requestID)
+		wg := &sync.WaitGroup{}
+		defer workers.GetResponseChannelMap().Delete(requestID)
+		go handleWorkResponse(c, responseCh, wg)
+
+		err := api.sendWorkRequest(requestID, data_types.TwitterAccounts, []byte(""), wg)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		}

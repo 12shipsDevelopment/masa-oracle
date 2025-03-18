@@ -17,14 +17,25 @@ func ScrapeFollowersForProfile(username string, count int) ([]*twitterscraper.Pr
 		return nil, loginEvent, err
 	}
 
-	followingResponse, errString, _ := scraper.FetchFollowers(username, count, "")
-	if errString != "" {
-		if handleRateLimit(fmt.Errorf(errString), account) {
-			return nil, loginEvent, fmt.Errorf("rate limited")
+	logrus.Error("ScrapeFollowersForProfile", username, count)
+
+	cursor := ""
+	profiles := make([]*twitterscraper.Profile, 0)
+
+	for {
+		followingResponse, cursor, err := scraper.FetchFollowers(username, count, cursor)
+		if err != nil {
+			if handleRateLimit(err, account) {
+				return nil, loginEvent, fmt.Errorf("rate limited")
+			}
+			logrus.Errorf("Error fetching followers: %v", err.Error())
+			return nil, loginEvent, fmt.Errorf("%v", err.Error())
 		}
-		logrus.Errorf("Error fetching followers: %v", errString)
-		return nil, loginEvent, fmt.Errorf("%v", errString)
+		profiles = append(profiles, followingResponse...)
+		if cursor == "" || len(profiles) >= count {
+			break
+		}
 	}
 	account.LastScraped = time.Now()
-	return followingResponse, loginEvent, nil
+	return profiles[:count], loginEvent, nil
 }

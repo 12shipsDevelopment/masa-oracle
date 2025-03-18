@@ -2,14 +2,20 @@ package twitter
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/masa-finance/masa-oracle/pkg/workers/types"
+	data_types "github.com/masa-finance/masa-oracle/pkg/workers/types"
 )
 
 func NewScraper(account *TwitterAccount, cookieDir string) (*Scraper, *data_types.LoginEvent) {
 	scraper := &Scraper{Scraper: newTwitterScraper()}
+	http_proxy := os.Getenv("http_proxy")
+	if http_proxy != "" {
+		logrus.Info("use http_proxy: ", http_proxy)
+		scraper.SetProxy(http_proxy)
+	}
 	var loginEvent *data_types.LoginEvent
 	if err := LoadCookies(scraper.Scraper, account, cookieDir); err == nil {
 		logrus.Debugf("Cookies loaded for user %s.", account.Username)
@@ -36,6 +42,7 @@ func NewScraper(account *TwitterAccount, cookieDir string) (*Scraper, *data_type
 		logrus.WithError(err).Errorf("Failed to save cookies for %s", account.Username)
 	}
 
+	logrus.Errorf("Login successful for %s", account.Username)
 	logrus.Debugf("Login successful for %s", account.Username)
 	// Log a successful login event
 	loginEvent = data_types.NewLoginEvent("", account.Username, "Twitter", true, "")

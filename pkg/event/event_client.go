@@ -8,9 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	data_types "github.com/masa-finance/masa-oracle/pkg/workers/types"
 	"github.com/sirupsen/logrus"
-
-	"github.com/masa-finance/masa-oracle/pkg/workers/types"
 )
 
 type EventClient struct {
@@ -77,6 +76,8 @@ func (c *EventClient) SendLoginEvent(event *data_types.LoginEvent) error {
 		return err
 	}
 
+	c.Logger.Error("loginevent" + url)
+	c.Logger.Error("payload" + string(payload))
 	resp, err := c.HTTPClient.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		c.Logger.WithError(err).Error("Failed to send login event")

@@ -22,6 +22,7 @@ const (
 	TwitterFollowers        WorkerType = "twitter-followers"
 	TwitterProfile          WorkerType = "twitter-profile"
 	TwitterTweet            WorkerType = "twitter-tweet"
+	TwitterAccounts         WorkerType = "twitter-accounts"
 	Web                     WorkerType = "web"
 	WebSentiment            WorkerType = "web-sentiment"
 	Test                    WorkerType = "test"
@@ -42,7 +43,7 @@ func WorkerTypeToCategory(wt WorkerType) pubsub.WorkerCategory {
 	case TelegramSentiment, TelegramChannelMessages:
 		logrus.Info("WorkerType is related to Telegram")
 		return pubsub.CategoryTelegram
-	case Twitter, TwitterFollowers, TwitterProfile, TwitterTweet:
+	case Twitter, TwitterFollowers, TwitterProfile, TwitterTweet, TwitterAccounts:
 		logrus.Info("WorkerType is related to Twitter")
 		return pubsub.CategoryTwitter
 	case Web, WebSentiment:
@@ -64,7 +65,7 @@ func WorkerTypeToDataSource(wt WorkerType) string {
 	case TelegramSentiment, TelegramChannelMessages:
 		logrus.Info("WorkerType is related to Telegram")
 		return DataSourceTelegram
-	case Twitter, TwitterFollowers, TwitterProfile, TwitterTweet:
+	case Twitter, TwitterFollowers, TwitterProfile, TwitterTweet, TwitterAccounts:
 		logrus.Info("WorkerType is related to Twitter")
 		return DataSourceTwitter
 	case Web, WebSentiment:

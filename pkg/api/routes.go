@@ -468,6 +468,8 @@ func SetupRoutes(node *node.OracleNode, workerManager *workers.WorkHandlerManage
 		// @note a test route
 		v1.POST("/test", API.Test())
 
+		// @note a check twitter accounts route
+		v1.GET("/check/twitter/accounts", API.CheckTwitterAccounts())
 	}
 
 	// @Summary Node Status Page

@@ -13,6 +13,7 @@ type TwitterQueryHandler struct{}
 type TwitterFollowersHandler struct{}
 type TwitterProfileHandler struct{}
 type TwitterTweetHandler struct{}
+type TwitterCheckAccountsHandler struct{}
 
 func (h *TwitterTweetHandler) HandleWork(data []byte) data_types.WorkResponse {
 	logrus.Infof("[+] TwitterTweetHandler input: %s", data)
@@ -92,4 +93,37 @@ func (h *TwitterProfileHandler) HandleWork(data []byte) data_types.WorkResponse 
 	}
 	logrus.Infof("[+] TwitterProfileHandler Work response for %s: %d records returned", data_types.TwitterProfile, 1)
 	return data_types.WorkResponse{Data: resp, RecordCount: 1}
+}
+
+type AccountsStatus struct {
+	HealthyAcounts      []string `json:"healthy-acounts"`
+	RateLimitedAccounts []string `json:"rate-limited-accounts"`
+	AbnormalAcounts     []string `json:"abnormal-acounts"`
+}
+
+func (h *TwitterCheckAccountsHandler) HandleWork(data []byte) data_types.WorkResponse {
+	logrus.Infof("[+] TwitterCheckAccountsHandler %s", data)
+
+	rateLimitedAccounts := make([]string, 0)
+	healthyAcounts := make([]string, 0)
+	abnormalAcounts := make([]string, 0)
+	accountManager := twitter.GetAccountManager()
+	accounts := accountManager.GetAccountStates()
+	for _, account := range accounts {
+		if account.IsRateLimited {
+			rateLimitedAccounts = append(rateLimitedAccounts, account.Username)
+		}
+		if account.LoginStatus == "Successful" {
+			healthyAcounts = append(healthyAcounts, account.Username)
+		} else {
+			abnormalAcounts = append(abnormalAcounts, account.Username+" - "+account.LoginStatus)
+		}
+	}
+
+	logrus.Infof("[+] TwitterCheckAccountsHandler Work response for %s: %d records returned", data_types.TwitterAccounts, len(accounts))
+	return data_types.WorkResponse{Data: AccountsStatus{
+		HealthyAcounts:      healthyAcounts,
+		RateLimitedAccounts: rateLimitedAccounts,
+		AbnormalAcounts:     abnormalAcounts,
+	}, RecordCount: 1}
 }

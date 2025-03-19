@@ -19,11 +19,12 @@ import (
 	"github.com/masa-finance/masa-oracle/pkg/config"
 	"github.com/masa-finance/masa-oracle/pkg/event"
 	"github.com/masa-finance/masa-oracle/pkg/pubsub"
+	"github.com/masa-finance/masa-oracle/pkg/scrapers/twitter"
 	"github.com/masa-finance/masa-oracle/pkg/workers/handlers"
 	data_types "github.com/masa-finance/masa-oracle/pkg/workers/types"
 )
 
-func NewWorkHandlerManager(opts ...WorkerOptionFunc) *WorkHandlerManager {
+func NewWorkHandlerManager(twitterCacher *twitter.TwitterCacher, opts ...WorkerOptionFunc) *WorkHandlerManager {
 	options := &WorkerOption{}
 	options.Apply(opts...)
 
@@ -33,7 +34,7 @@ func NewWorkHandlerManager(opts ...WorkerOptionFunc) *WorkHandlerManager {
 	}
 
 	if options.isTwitterWorker {
-		whm.addWorkHandler(data_types.Twitter, &handlers.TwitterQueryHandler{})
+		whm.addWorkHandler(data_types.Twitter, handlers.NewTwitterQueryHandler(twitterCacher))
 		whm.addWorkHandler(data_types.TwitterFollowers, &handlers.TwitterFollowersHandler{})
 		whm.addWorkHandler(data_types.TwitterProfile, &handlers.TwitterProfileHandler{})
 		whm.addWorkHandler(data_types.TwitterTweet, &handlers.TwitterTweetHandler{})

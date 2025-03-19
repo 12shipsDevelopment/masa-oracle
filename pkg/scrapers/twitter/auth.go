@@ -13,7 +13,6 @@ func NewScraper(account *TwitterAccount, cookieDir string) (*Scraper, *data_type
 	scraper := &Scraper{Scraper: newTwitterScraper()}
 	http_proxy := os.Getenv("http_proxy")
 	if http_proxy != "" {
-		logrus.Info("use http_proxy: ", http_proxy)
 		scraper.SetProxy(http_proxy)
 	}
 	var loginEvent *data_types.LoginEvent

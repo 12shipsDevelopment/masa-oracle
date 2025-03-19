@@ -9,7 +9,14 @@ import (
 	data_types "github.com/masa-finance/masa-oracle/pkg/workers/types"
 )
 
-type TwitterQueryHandler struct{}
+type TwitterQueryHandler struct {
+	twitterCacher *twitter.TwitterCacher
+}
+
+func NewTwitterQueryHandler(twitterCacher *twitter.TwitterCacher) *TwitterQueryHandler {
+	return &TwitterQueryHandler{twitterCacher: twitterCacher}
+}
+
 type TwitterFollowersHandler struct{}
 type TwitterProfileHandler struct{}
 type TwitterTweetHandler struct{}
@@ -48,7 +55,13 @@ func (h *TwitterQueryHandler) HandleWork(data []byte) data_types.WorkResponse {
 
 	logrus.Infof("[+] Scraping tweets for query: %s, count: %d", query, count)
 
-	resp, loginEvent, err := twitter.ScrapeTweetsByQuery(query, count)
+	var resp []*twitter.TweetResult
+	var loginEvent *data_types.LoginEvent
+	if h.twitterCacher != nil {
+		resp, loginEvent, err = h.twitterCacher.GetTweets(query, count)
+	} else {
+		resp, loginEvent, err = twitter.ScrapeTweetsByQueryByAccountsRound(query, count)
+	}
 	if err != nil {
 		logrus.Errorf("[+] TwitterQueryHandler error scraping tweets: %v", err)
 		return data_types.WorkResponse{Error: err.Error(), LoginEvent: loginEvent}

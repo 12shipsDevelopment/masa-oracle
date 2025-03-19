@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/masa-finance/masa-oracle/internal/versioning"
@@ -17,6 +18,7 @@ import (
 	"github.com/masa-finance/masa-oracle/pkg/config"
 	"github.com/masa-finance/masa-oracle/pkg/db"
 	"github.com/masa-finance/masa-oracle/pkg/masacrypto"
+	"github.com/masa-finance/masa-oracle/pkg/scrapers/twitter"
 	"github.com/masa-finance/masa-oracle/pkg/staking"
 )
 
@@ -72,7 +74,18 @@ func main() {
 
 	isValidator := cfg.Validator
 
-	masaNodeOptions, workHandlerManager, pubKeySub := initOptions(cfg)
+	var twitterCacher *twitter.TwitterCacher
+	if cfg.TwitterCacheEnabled {
+		logrus.Error(cfg.RedisAddress)
+		rdb := redis.NewClient(&redis.Options{
+			Addr:     cfg.RedisAddress,
+			Password: "",
+			DB:       0,
+		})
+		twitterCacher = twitter.NewTwitterCacher(rdb)
+		go twitterCacher.Start(ctx)
+	}
+	masaNodeOptions, workHandlerManager, pubKeySub := initOptions(cfg, twitterCacher)
 	// Create a new OracleNode
 	masaNode, err := node.NewOracleNode(ctx, masaNodeOptions...)
 

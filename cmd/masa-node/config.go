@@ -4,10 +4,11 @@ import (
 	"github.com/masa-finance/masa-oracle/node"
 	"github.com/masa-finance/masa-oracle/pkg/config"
 	pubsub "github.com/masa-finance/masa-oracle/pkg/pubsub"
+	"github.com/masa-finance/masa-oracle/pkg/scrapers/twitter"
 	"github.com/masa-finance/masa-oracle/pkg/workers"
 )
 
-func initOptions(cfg *config.AppConfig) ([]node.Option, *workers.WorkHandlerManager, *pubsub.PublicKeySubscriptionHandler) {
+func initOptions(cfg *config.AppConfig, twitterCacher *twitter.TwitterCacher) ([]node.Option, *workers.WorkHandlerManager, *pubsub.PublicKeySubscriptionHandler) {
 	// WorkerManager configuration
 	// XXX: this needs to be moved under config, but now it's here as there are import cycles given singletons
 	workerManagerOptions := []workers.WorkerOptionFunc{}
@@ -46,7 +47,7 @@ func initOptions(cfg *config.AppConfig) ([]node.Option, *workers.WorkHandlerMana
 		masaNodeOptions = append(masaNodeOptions, node.IsLlmServer)
 	}
 
-	workHandlerManager := workers.NewWorkHandlerManager(workerManagerOptions...)
+	workHandlerManager := workers.NewWorkHandlerManager(twitterCacher, workerManagerOptions...)
 	blockChainEventTracker := node.NewBlockChain()
 	pubKeySub := &pubsub.PublicKeySubscriptionHandler{}
 

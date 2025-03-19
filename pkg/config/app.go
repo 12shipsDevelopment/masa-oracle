@@ -51,19 +51,21 @@ type AppConfig struct {
 	CachePath            string   `mapstructure:"cachePath"`
 	Faucet               bool     `mapstructure:"faucet"`
 
-	DiscordBotToken  string `mapstructure:"discordBotToken"`
-	ClaudeApiKey     string `mapstructure:"claudeApiKey"`
-	ClaudeApiURL     string `mapstructure:"claudeApiURL"`
-	ClaudeApiVersion string `mapstructure:"claudeApiVersion"`
-	GPTApiKey        string `mapstructure:"gptApiKey"`
-	TwitterScraper   bool   `mapstructure:"twitterScraper"`
-	DiscordScraper   bool   `mapstructure:"discordScraper"`
-	TelegramScraper  bool   `mapstructure:"telegramScraper"`
-	WebScraper       bool   `mapstructure:"webScraper"`
-	LlmServer        bool   `mapstructure:"llmServer"`
-	LLMChatUrl       string `mapstructure:"llmChatUrl"`
-	LLMCfUrl         string `mapstructure:"llmCfUrl"`
-	APIEnabled       bool   `mapstructure:"api_enabled"`
+	DiscordBotToken     string `mapstructure:"discordBotToken"`
+	ClaudeApiKey        string `mapstructure:"claudeApiKey"`
+	ClaudeApiURL        string `mapstructure:"claudeApiURL"`
+	ClaudeApiVersion    string `mapstructure:"claudeApiVersion"`
+	GPTApiKey           string `mapstructure:"gptApiKey"`
+	TwitterScraper      bool   `mapstructure:"twitterScraper"`
+	DiscordScraper      bool   `mapstructure:"discordScraper"`
+	TelegramScraper     bool   `mapstructure:"telegramScraper"`
+	WebScraper          bool   `mapstructure:"webScraper"`
+	LlmServer           bool   `mapstructure:"llmServer"`
+	LLMChatUrl          string `mapstructure:"llmChatUrl"`
+	LLMCfUrl            string `mapstructure:"llmCfUrl"`
+	APIEnabled          bool   `mapstructure:"api_enabled"`
+	TwitterCacheEnabled bool   `mapstructure:"twitter_cache_enabled"`
+	RedisAddress        string `mapstructure:"redis_address"`
 
 	TelegramStop bg.StopFunc
 }
@@ -100,6 +102,7 @@ func GetInstance() *AppConfig {
 		}
 
 		instance.APIEnabled = viper.GetBool("api_enabled")
+		instance.TwitterCacheEnabled = viper.GetBool("twitter_cache_enabled")
 	})
 	return instance
 }
@@ -196,6 +199,8 @@ func (c *AppConfig) setCommandLineConfig() error {
 	pflag.BoolVar(&c.LlmServer, "llmServer", viper.GetBool(LlmServer), "Can service LLM requests")
 	pflag.BoolVar(&c.Faucet, "faucet", viper.GetBool(Faucet), "Faucet")
 	pflag.BoolVar(&c.APIEnabled, "api-enabled", viper.GetBool("api_enabled"), "Enable API server")
+	pflag.BoolVar(&c.TwitterCacheEnabled, "twitter-cache-enabled", viper.GetBool("twitter_cache_enabled"), "Enable Twitter Cache")
+	pflag.StringVar(&c.RedisAddress, "redis-address", viper.GetString("redis_address"), "Redis Address")
 
 	pflag.Parse()
 
@@ -207,6 +212,7 @@ func (c *AppConfig) setCommandLineConfig() error {
 
 	// Add this line after binding flags
 	viper.Set("api_enabled", c.APIEnabled)
+	viper.Set("cache_api_enabled", c.TwitterCacheEnabled)
 
 	c.Bootnodes = strings.Split(bootnodes, ",")
 

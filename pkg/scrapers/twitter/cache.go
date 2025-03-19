@@ -265,7 +265,7 @@ func (c *TwitterCacher) cache(key string, tweets []*TweetResult) error {
 	if err != nil {
 		return errors.Errorf("[%s] marshal failed: %v", key, err)
 	} else {
-		err = c.rdb.Set(context.Background(), key, bytes, 10*time.Minute).Err()
+		err = c.rdb.Set(context.Background(), key, bytes, 30*time.Minute).Err()
 		if err != nil {
 			return errors.Errorf("[%s] update cache failed: %v", key, err)
 		} else {

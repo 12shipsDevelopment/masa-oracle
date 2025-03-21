@@ -16,12 +16,11 @@ type TweetResult struct {
 	Error error
 }
 type SimpleTweetResult struct {
-	Tweet *twitterscraper.Tweet
+	Tweet *SimpleTweet
 	Error error
 }
-type Tweet struct {
+type SimpleTweet struct {
 	Hashtags   []string
-	HTML       string
 	ID         string
 	Name       string
 	Text       string
@@ -29,6 +28,26 @@ type Tweet struct {
 	Timestamp  int64
 	UserID     string
 	Username   string
+}
+
+func SimplifyTweetResult(full []*TweetResult) []*SimpleTweetResult {
+	var simple []*SimpleTweetResult
+	for _, f := range full {
+		simple = append(simple, &SimpleTweetResult{
+			Error: f.Error,
+			Tweet: &SimpleTweet{
+				Hashtags:   f.Tweet.Hashtags,
+				ID:         f.Tweet.ID,
+				Name:       f.Tweet.Name,
+				Text:       f.Tweet.Text,
+				TimeParsed: f.Tweet.TimeParsed,
+				Timestamp:  f.Tweet.Timestamp,
+				UserID:     f.Tweet.UserID,
+				Username:   f.Tweet.Username,
+			},
+		})
+	}
+	return simple
 }
 
 func ScrapeTweetByID(id string) (*twitterscraper.Tweet, *data_types.LoginEvent, error) {

@@ -56,13 +56,15 @@ func (h *TwitterQueryHandler) HandleWork(data []byte) data_types.WorkResponse {
 
 	logrus.Infof("[+] Scraping tweets for query: %s, count: %d", query, count)
 
-	var resp []*twitter.TweetResult
+	var resp []*twitter.SimpleTweetResult
 	var loginEvent *data_types.LoginEvent
 	start := time.Now()
 	if h.twitterCacher != nil {
-		resp, loginEvent, err = h.twitterCacher.Fetch(query, count)
+		resp, loginEvent, err = h.twitterCacher.GetTweets(query, count)
 	} else {
-		resp, loginEvent, err = twitter.ScrapeTweetsByQueryWithRetry(query, count)
+		var fullResp []*twitter.TweetResult
+		fullResp, loginEvent, err = twitter.ScrapeTweetsByQueryWithRetry(query, count)
+		resp = twitter.SimplifyTweetResult(fullResp)
 	}
 	logrus.Infof("query cost: [%s] %d %s\n", query, count, time.Since(start))
 

@@ -2,8 +2,10 @@ package twitter
 
 import (
 	"context"
+	"time"
 
 	twitterscraper "github.com/imperatrona/twitter-scraper"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	data_types "github.com/masa-finance/masa-oracle/pkg/workers/types"
@@ -12,6 +14,21 @@ import (
 type TweetResult struct {
 	Tweet *twitterscraper.Tweet
 	Error error
+}
+type SimpleTweetResult struct {
+	Tweet *twitterscraper.Tweet
+	Error error
+}
+type Tweet struct {
+	Hashtags   []string
+	HTML       string
+	ID         string
+	Name       string
+	Text       string
+	TimeParsed time.Time
+	Timestamp  int64
+	UserID     string
+	Username   string
 }
 
 func ScrapeTweetByID(id string) (*twitterscraper.Tweet, *data_types.LoginEvent, error) {
@@ -51,21 +68,64 @@ func ScrapeTweetsByQuery(query string, count int) ([]*TweetResult, *data_types.L
 	return tweets, loginEvent, nil
 }
 
+func ScrapeTweetsByQueryWithRetry(query string, count int) ([]*TweetResult, *data_types.LoginEvent, error) {
+	tried := make(map[string]bool)
+	for {
+		scraper, account, loginEvent, err := getAuthenticatedScraper()
+		if err != nil {
+			continue
+		}
+		if _, exists := tried[account.Username]; exists {
+			return nil, nil, errors.Errorf("all accounts fail to fetch")
+		}
+
+		tried[account.Username] = true
+
+		var tweets []*TweetResult
+		ctx := context.Background()
+		scraper.SetSearchMode(twitterscraper.SearchLatest)
+		hasErr := false
+		for tweet := range scraper.SearchTweets(ctx, query, count) {
+			if tweet.Error != nil {
+				handleRateLimit(tweet.Error, account)
+				hasErr = true
+				break
+			}
+			logrus.Info(tweet.Timestamp)
+			tweets = append(tweets, &TweetResult{Tweet: &tweet.Tweet})
+		}
+		if !hasErr {
+			return tweets, loginEvent, nil
+		}
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
-func ScrapeTweetsByQueryByAccountsRound(query string, count int) ([]*TweetResult, *data_types.LoginEvent, error) {
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+func ScrapeTweetsByQueryByAccountsRound(query string, count int, cursor string) ([]*TweetResult, *data_types.LoginEvent, string, error) {
 	var tweets []*TweetResult
-	cursor := ""
 	l1 := 0
-	batchSize := 20
+	batchSize := 1000
+	totalAccounts := getAccountsCount()
+	i := 0
 	for {
-		scraper, account, loginEvent, err := getAuthenticatedScraper()
+		i++
+		if i > totalAccounts {
+			return nil, nil, cursor, errors.Errorf("all accounts fail to fetch")
+		}
+		scraper, account, _, err := getAuthenticatedScraper()
 		if err != nil {
-			return nil, loginEvent, err
+			continue
 		}
 
 		ctx := context.Background()
@@ -93,5 +153,5 @@ func ScrapeTweetsByQueryByAccountsRound(query string, count int) ([]*TweetResult
 			break
 		}
 	}
-	return tweets[:count], nil, nil
+	return tweets, nil, cursor, nil
 }

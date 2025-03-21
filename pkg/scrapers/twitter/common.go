@@ -60,6 +60,11 @@ func parseAccounts(accountPairs []string) []*TwitterAccount {
 	})
 }
 
+func getAccountsCount() int {
+	once.Do(initializeAccountManager)
+	return len(accountManager.accounts)
+}
+
 func getAuthenticatedScraper() (*Scraper, *TwitterAccount, *data_types.LoginEvent, error) {
 	once.Do(initializeAccountManager)
 	baseDir := config.GetInstance().MasaDir

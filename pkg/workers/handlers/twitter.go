@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -57,11 +58,14 @@ func (h *TwitterQueryHandler) HandleWork(data []byte) data_types.WorkResponse {
 
 	var resp []*twitter.TweetResult
 	var loginEvent *data_types.LoginEvent
+	start := time.Now()
 	if h.twitterCacher != nil {
-		resp, loginEvent, err = h.twitterCacher.GetTweets(query, count)
+		resp, loginEvent, err = h.twitterCacher.Fetch(query, count)
 	} else {
-		resp, loginEvent, err = twitter.ScrapeTweetsByQueryByAccountsRound(query, count)
+		resp, loginEvent, err = twitter.ScrapeTweetsByQueryWithRetry(query, count)
 	}
+	logrus.Infof("query cost: [%s] %d %s\n", query, count, time.Since(start))
+
 	if err != nil {
 		logrus.Errorf("[+] TwitterQueryHandler error scraping tweets: %v", err)
 		return data_types.WorkResponse{Error: err.Error(), LoginEvent: loginEvent}

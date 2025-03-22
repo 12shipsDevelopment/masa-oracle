@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -414,7 +415,10 @@ func (c *TwitterCacher) getKeywords() []string {
 		if err != nil {
 			return keywords
 		}
-		keywords = append(keywords, trendingQueries[:10]...)
+		for _, tq := range trendingQueries[:10] {
+			// strip in py
+			keywords = append(keywords, strings.TrimSpace(tq))
+		}
 	}
 	return keywords
 }

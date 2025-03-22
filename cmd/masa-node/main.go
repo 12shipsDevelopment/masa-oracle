@@ -83,7 +83,7 @@ func main() {
 			DB:       0,
 		})
 		twitterCacher = twitter.NewTwitterCacher(rdb)
-		// go twitterCacher.Start(ctx)
+		go twitterCacher.Start(ctx)
 	}
 	masaNodeOptions, workHandlerManager, pubKeySub := initOptions(cfg, twitterCacher)
 	// Create a new OracleNode

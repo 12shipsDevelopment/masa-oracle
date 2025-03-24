@@ -24,7 +24,7 @@ import (
 // const FETCH_FOR_PREAPPEND = 100
 // const TRENDING_COUNT = 2
 const INTERVAL_FETCH = 10
-const FETCH_PER_ROUND = 1000
+const FETCH_PER_ROUND = 2000
 const FETCH_FOR_USER = 200
 const FETCH_FOR_PREAPPEND = 200
 const TRENDING_COUNT = 10
@@ -69,13 +69,13 @@ func (c *TwitterCacher) Start(ctx context.Context) {
 
 		keywords := c.getKeywords()
 		logWithPrefix("start fetching another round: %v", keywords)
-		for _, keyword := range keywords {
-			// TODO: concurrency
-			c.allTrendings[keyword] = true
-			logWithPrefix("add %s to all trending", keyword)
+		// for _, keyword := range keywords {
+		// 	// TODO: concurrency
+		// 	c.allTrendings[keyword] = true
+		// 	logWithPrefix("add %s to all trending", keyword)
 
-			c.fetch(keyword, FETCH_PER_ROUND)
-		}
+		// 	c.fetch(keyword, FETCH_PER_ROUND)
+		// }
 
 		elapsed := time.Since(start)
 		logWithPrefix("this round takes: %s\n", elapsed)
@@ -155,33 +155,31 @@ func removeExpire(array []*SimpleTweetResult, deadline int64) []*SimpleTweetResu
 }
 
 func (c *TwitterCacher) GetTweets(query string, count int) ([]*SimpleTweetResult, *data_types.LoginEvent, error) {
-	if c.allTrendings[query] {
-		// 如果是trending中的，拿得到锁就每次多取些，拿不到就返回缓存的。
-		// TODO: 再想想，是所有trending的都这么做，还是仅当前trending的？
-		logWithPrefix("[%s] in trending", query)
-		return c.fetch(query, FETCH_PER_ROUND)
-	} else {
-		logWithPrefix("[%s] not in trending", query)
-		// 非trending的关键字,不参与打分，只返回第一次缓存值。
-		lock := c.getLock(query)
-		lock.Lock()
-		defer lock.Unlock()
+	// if c.allTrendings[query] {
+	// logWithPrefix("[%s] in trending", query)
+	return c.fetch(query, FETCH_PER_ROUND)
+	// } else {
+	// 	logWithPrefix("[%s] not in trending", query)
+	// 	// 非trending的关键字,不参与打分，只返回第一次缓存值。
+	// 	lock := c.getLock(query)
+	// 	lock.Lock()
+	// 	defer lock.Unlock()
 
-		existingTweets, err := c.getCacheTweets(query)
-		if err != nil {
-			return nil, nil, err
-		}
-		if existingTweets == nil {
-			result, loginEvent, _, err := ScrapeTweetsByQueryByAccountsRound(query, min(count, FETCH_PER_ROUND), "")
-			if err != nil {
-				return nil, loginEvent, err
-			}
-			tweets := SimplifyTweetResult(result)
-			c.cacheTweets(query, tweets)
-			return tweets, loginEvent, err
-		}
-		return existingTweets, nil, nil
-	}
+	// 	existingTweets, err := c.getCacheTweets(query)
+	// 	if err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// 	if existingTweets == nil {
+	// 		result, loginEvent, _, err := ScrapeTweetsByQueryByAccountsRound(query, min(count, FETCH_PER_ROUND), "")
+	// 		if err != nil {
+	// 			return nil, loginEvent, err
+	// 		}
+	// 		tweets := SimplifyTweetResult(result)
+	// 		c.cacheTweets(query, tweets)
+	// 		return tweets, loginEvent, err
+	// 	}
+	// 	return existingTweets, nil, nil
+	// }
 }
 
 func (c *TwitterCacher) fetch(query string, max int) ([]*SimpleTweetResult, *data_types.LoginEvent, error) {

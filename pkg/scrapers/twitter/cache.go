@@ -18,10 +18,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// const INTERVAL_FETCH = 5
+// const FETCH_PER_ROUND = 200
+// const FETCH_FOR_USER = 200
+// const FETCH_FOR_PREAPPEND = 100
+// const TRENDING_COUNT = 2
 const INTERVAL_FETCH = 10
 const FETCH_PER_ROUND = 1000
 const FETCH_FOR_USER = 200
 const FETCH_FOR_PREAPPEND = 200
+const TRENDING_COUNT = 10
+
+const CURSOR_END = "CURSOR_END"
 
 // 对于非trending中的，只查第一个请求并缓存，后面的都返回缓存中的，不管多少。
 // 对于trending中的，每10分钟各处理N个。N根据机器在不超时情况下根据处理能力决定。
@@ -64,15 +72,9 @@ func (c *TwitterCacher) Start(ctx context.Context) {
 		for _, keyword := range keywords {
 			// TODO: concurrency
 			c.allTrendings[keyword] = true
+			logWithPrefix("add %s to all trending", keyword)
 
-			lock := c.getLock(keyword)
-			if lock.TryLock() {
-				c.fetch(keyword, FETCH_PER_ROUND)
-				lock.Unlock()
-			} else {
-				// no need to cache since other goroutine is fetching.
-				logWithPrefix("other goroutine is fetching %s", keyword)
-			}
+			c.fetch(keyword, FETCH_PER_ROUND)
 		}
 
 		elapsed := time.Since(start)
@@ -129,6 +131,19 @@ func yesterday() int64 {
 	return startOfYesterday.Unix()
 }
 
+func removeDuplicates(array []*SimpleTweetResult) []*SimpleTweetResult {
+	var newArray []*SimpleTweetResult
+	exists := make(map[string]bool)
+	duplicates := 0
+	for _, t := range array {
+		if _, exist := exists[t.Tweet.ID]; !exist {
+			newArray = append(newArray, t)
+		}
+	}
+	logWithPrefix("remove total duplicates: %d", duplicates)
+	return newArray
+}
+
 func removeExpire(array []*SimpleTweetResult, deadline int64) []*SimpleTweetResult {
 	for i := len(array) - 1; i >= 0; i-- {
 		if array[i].Tweet.Timestamp > deadline {
@@ -143,8 +158,10 @@ func (c *TwitterCacher) GetTweets(query string, count int) ([]*SimpleTweetResult
 	if c.allTrendings[query] {
 		// 如果是trending中的，拿得到锁就每次多取些，拿不到就返回缓存的。
 		// TODO: 再想想，是所有trending的都这么做，还是仅当前trending的？
+		logWithPrefix("[%s] in trending", query)
 		return c.fetch(query, FETCH_PER_ROUND)
 	} else {
+		logWithPrefix("[%s] not in trending", query)
 		// 非trending的关键字,不参与打分，只返回第一次缓存值。
 		lock := c.getLock(query)
 		lock.Lock()
@@ -168,6 +185,7 @@ func (c *TwitterCacher) GetTweets(query string, count int) ([]*SimpleTweetResult
 }
 
 func (c *TwitterCacher) fetch(query string, max int) ([]*SimpleTweetResult, *data_types.LoginEvent, error) {
+	logWithPrefix("[%s] advanced fetch: %d", query, max)
 	updateCache := true
 	existingTweets, err := c.getCacheTweets(query)
 	if err != nil {
@@ -234,7 +252,20 @@ func (c *TwitterCacher) fetch(query string, max int) ([]*SimpleTweetResult, *dat
 	logWithPrefix("[%s] yesterday: %d", query, yesterday)
 
 	finalProcess := func(tweets []*SimpleTweetResult, deadline int64) []*SimpleTweetResult {
+		// remove cursor if fetches all
+		if tweets[len(tweets)-1].Tweet.Timestamp < deadline {
+			err = c.cacheMeta(query, CURSOR_END)
+			if err != nil {
+				// TODO: if cache fail, may have duplications
+				logErrorWithPrefix("[%s-meta] rm cache cursor failed: %v", query, err)
+			} else {
+				logrus.Infof("[%s-meta] cursor removed", query)
+			}
+		}
+
+		// 删除过期的
 		finalTweets := removeExpire(tweets, deadline)
+		finalTweets = removeDuplicates(finalTweets)
 		if updateCache {
 			err = c.cacheTweets(query, finalTweets)
 			if err != nil {
@@ -275,43 +306,41 @@ func (c *TwitterCacher) fetch(query string, max int) ([]*SimpleTweetResult, *dat
 			return finalProcess(allTweets, yesterday), nil, nil
 		}
 	}
-	for {
-		logWithPrefix("[%s] get %d, cursor: %s", query, min(1000, max), cursor)
-		var result []*TweetResult
-		result, _, cursor, err = ScrapeTweetsByQueryByAccountsRound(query, min(1000, max), cursor)
-		if err != nil {
-			logErrorWithPrefix("[%s] scrape error: %v", query, err)
-			err = c.cacheMeta(query, "")
+	if cursor != CURSOR_END {
+		for {
+			logWithPrefix("[%s] get %d, cursor: %s", query, min(1000, max), cursor)
+			var result []*TweetResult
+			result, _, cursor, err = ScrapeTweetsByQueryByAccountsRound(query, min(1000, max), cursor)
 			if err != nil {
-				logErrorWithPrefix("[%s-meta] cache failed: %v", query, err)
-			}
-			break
-		}
-		tweets := SimplifyTweetResult(result)
-		accumulated += len(tweets)
-		expire := false
-		for _, t := range tweets {
-			if t.Tweet.Timestamp > yesterday {
-				allTweets = append(allTweets, t)
-			} else {
-				logWithPrefix("[%s] fetch stops: %d > yesterday %d", query, t.Tweet.Timestamp, yesterday)
-				expire = true
+				logErrorWithPrefix("[%s] scrape error: %v", query, err)
 				break
 			}
-		}
-		if expire {
-			err = c.cacheMeta(query, "")
-			if err != nil {
-				logErrorWithPrefix("[%s-meta] cache failed: %v", query, err)
+			tweets := SimplifyTweetResult(result)
+			accumulated += len(tweets)
+			expire := false
+			for _, t := range tweets {
+				if t.Tweet.Timestamp > yesterday {
+					allTweets = append(allTweets, t)
+				} else {
+					logWithPrefix("[%s] fetch stops: %d > yesterday %d", query, t.Tweet.Timestamp, yesterday)
+					expire = true
+					break
+				}
 			}
-			break
-		}
-		if accumulated >= max {
-			err = c.cacheMeta(query, cursor)
-			if err != nil {
-				logErrorWithPrefix("[%s-meta] cache failed: %v", query, err)
+			if expire {
+				err = c.cacheMeta(query, CURSOR_END)
+				if err != nil {
+					logErrorWithPrefix("[%s-meta] cache failed: %v", query, err)
+				}
+				break
 			}
-			break
+			if accumulated >= max {
+				err = c.cacheMeta(query, cursor)
+				if err != nil {
+					logErrorWithPrefix("[%s-meta] cache failed: %v", query, err)
+				}
+				break
+			}
 		}
 	}
 	if len(allTweets) > 0 {
@@ -350,7 +379,7 @@ func (c *TwitterCacher) cacheTweets(key string, tweets []*SimpleTweetResult) err
 	if err != nil {
 		return errors.Errorf("[%s] marshal failed: %v", key, err)
 	}
-	if err = c.rdb.Set(context.Background(), key, bytes, 24*time.Hour).Err(); err != nil {
+	if err = c.rdb.Set(context.Background(), key, bytes, 0).Err(); err != nil {
 		return errors.Errorf("[%s] update cache failed: %v", key, err)
 	}
 	logWithPrefix("update cache for query: %s", key)
@@ -404,7 +433,7 @@ const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const BEARER_TOKEN = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 
 func (c *TwitterCacher) getKeywords() []string {
-	keywords := []string{"crypto", "btc", "eth"}
+	keywords := []string{"\"crypto\"", "\"btc\"", "\"eth\""}
 
 	guestToken, err := c.getGuestToken()
 	if err != nil {
@@ -413,11 +442,12 @@ func (c *TwitterCacher) getKeywords() []string {
 	} else {
 		trendingQueries, err := c.getTrendings(guestToken)
 		if err != nil {
+			logErrorWithPrefix("fetch trending failed: %v", err)
 			return keywords
 		}
-		for _, tq := range trendingQueries[:10] {
+		for _, tq := range trendingQueries[:TRENDING_COUNT] {
 			// strip in py
-			keywords = append(keywords, strings.TrimSpace(tq))
+			keywords = append(keywords, fmt.Sprintf("\"%s\"", strings.TrimSpace(tq)))
 		}
 	}
 	return keywords
@@ -533,16 +563,16 @@ func (c *TwitterCacher) getTrendings(guestToken string) ([]string, error) {
 	var trendings []string
 	for _, trend := range trends {
 		if trend.TweetVolume != nil && *trend.TweetVolume > 0 {
-			trendings = append(trendings, trend.Query)
+			trendings = append(trendings, trend.Name)
 		}
 	}
 	return trendings, nil
 }
 
 func logWithPrefix(format string, args ...interface{}) {
-	logrus.Infof("|cache| "+format, args)
+	logrus.Infof("|cache| "+format, args...)
 }
 
 func logErrorWithPrefix(format string, args ...interface{}) {
-	logrus.Errorf("|cache| "+format, args)
+	logrus.Errorf("|cache| "+format, args...)
 }

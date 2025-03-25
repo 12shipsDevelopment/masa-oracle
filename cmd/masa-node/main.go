@@ -76,13 +76,18 @@ func main() {
 
 	var twitterCacher *twitter.TwitterCacher
 	if cfg.TwitterCacheEnabled {
-		logrus.Error(cfg.RedisAddress)
 		rdb := redis.NewClient(&redis.Options{
 			Addr:     cfg.RedisAddress,
 			Password: "",
 			DB:       0,
 		})
-		twitterCacher = twitter.NewTwitterCacher(rdb)
+		twitterCacher = twitter.NewTwitterCacher(rdb,
+			cfg.OnlyReadCache,
+			cfg.FetchInterval,
+			cfg.FetchMaxPerTask,
+			cfg.FetchPerRound,
+			cfg.FetchPreappend,
+		)
 		go twitterCacher.Start(ctx)
 	}
 	masaNodeOptions, workHandlerManager, pubKeySub := initOptions(cfg, twitterCacher)

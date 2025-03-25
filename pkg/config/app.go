@@ -66,6 +66,11 @@ type AppConfig struct {
 	APIEnabled          bool   `mapstructure:"api_enabled"`
 	TwitterCacheEnabled bool   `mapstructure:"twitter_cache_enabled"`
 	RedisAddress        string `mapstructure:"redis_address"`
+	OnlyReadCache       bool   `mapstructure:"only_read_cache"`
+	FetchInterval       int    `mapstructure:"fetch_interval"`
+	FetchMaxPerTask     int    `mapstructure:"fetch_max_per_task"`
+	FetchPerRound       int    `mapstructure:"fetch_per_round"`
+	FetchPreappend      int    `mapstructure:"fetch_preappend"`
 
 	TelegramStop bg.StopFunc
 }
@@ -201,6 +206,11 @@ func (c *AppConfig) setCommandLineConfig() error {
 	pflag.BoolVar(&c.APIEnabled, "api-enabled", viper.GetBool("api_enabled"), "Enable API server")
 	pflag.BoolVar(&c.TwitterCacheEnabled, "twitter-cache-enabled", viper.GetBool("twitter_cache_enabled"), "Enable Twitter Cache")
 	pflag.StringVar(&c.RedisAddress, "redis-address", viper.GetString("redis_address"), "Redis Address")
+	pflag.BoolVar(&c.OnlyReadCache, "only-read-cache", viper.GetBool("only_read_cache"), "Only Read Cache")
+	pflag.IntVar(&c.FetchInterval, "fetch-interval", viper.GetInt("fetch_interval"), "Fetch Interval")
+	pflag.IntVar(&c.FetchMaxPerTask, "fetch-max-per-task", viper.GetInt("fetch_max_per_task"), "Fetch Max Per Task")
+	pflag.IntVar(&c.FetchPerRound, "fetch-per-round", viper.GetInt("fetch_per_round"), "Fetch Per Round")
+	pflag.IntVar(&c.FetchPreappend, "fetch-preappend", viper.GetInt("fetch_preappend"), "Fetch Preappend")
 
 	pflag.Parse()
 

@@ -139,11 +139,13 @@ func ScrapeTweetsByQueryByAccountsRound(query string, count int, cursor string) 
 	i := 0
 	for {
 		i++
+		logrus.Infof("i %d total accounts %d", i, totalAccounts)
 		if i > totalAccounts {
 			return nil, nil, cursor, errors.Errorf("all accounts fail to fetch")
 		}
 		scraper, account, _, err := getAuthenticatedScraper()
 		if err != nil {
+			logrus.Error(err)
 			continue
 		}
 

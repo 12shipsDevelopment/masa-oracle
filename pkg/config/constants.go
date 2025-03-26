@@ -124,6 +124,11 @@ const (
 	APIEnabled          = "API_ENABLED"
 	TwitterCacheEnabled = "TWITTER_CACHE_ENALBED"
 	RedisAddress        = "REDIS_ADDRESS"
+	OnlyReadCache       = "ONLY_READ_CACHE"
+	FetchInterval       = "FETCH_INTERVAL"
+	FetchMaxPerTask     = "FETCH_MAX_PER_TASK"
+	FetchPerRound       = "FETCH_PER_ROUND"
+	FetchPreappend      = "FETCH_PREAPPEND"
 )
 
 // Function to call the Cloudflare API and parse the response

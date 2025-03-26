@@ -163,6 +163,7 @@
         <tr>
           <th>Twitter accounts</th>
           <th>Last scraped</th>
+          <th>Rate Limited</th>
           <th>X/Twitter login status</th>
           <th>X/Twitter login</th>
         </tr>
@@ -172,6 +173,7 @@
         <tr>
           <td>{{.Username}}</td>
           <td>{{.LastScraped}}</td>
+          <td>{{.IsRateLimited}} - {{.RateLimitedUntil}}</td>
           <td>
             {{if eq .LoginStatus "Successful"}}
             <span class="badge badge-success">{{.LoginStatus}}</span>

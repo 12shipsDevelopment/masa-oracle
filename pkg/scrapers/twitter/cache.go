@@ -177,6 +177,9 @@ func removeDuplicates(array []*SimpleTweetResult) []*SimpleTweetResult {
 	for _, t := range array {
 		if _, exist := exists[t.Tweet.ID]; !exist {
 			newArray = append(newArray, t)
+			exists[t.Tweet.ID] = true
+		} else {
+			duplicates++
 		}
 	}
 	logWithPrefix("remove total duplicates: %d", duplicates)
@@ -203,18 +206,18 @@ func (c *TwitterCacher) GetTweets(query string, count int) ([]*SimpleTweetResult
 			return existingTweets, nil, nil
 		}
 
-		lock := c.getLock(query)
-		if lock.TryLock() {
-			defer lock.Unlock()
+		// lock := c.getLock(query)
+		// if lock.TryLock() {
+		// 	defer lock.Unlock()
 
-			result, loginEvent, _, err := ScrapeTweetsByQueryByAccountsRound(query, c.fetchPerRound, "")
-			if err != nil {
-				return nil, loginEvent, err
-			}
-			tweets := SimplifyTweetResult(result)
-			logWithPrefix("[%s] only-read-cache, return newly %d", query, len(tweets))
-			return tweets, loginEvent, err
-		}
+		// 	result, loginEvent, _, err := ScrapeTweetsByQueryByAccountsRound(query, c.fetchPerRound, "")
+		// 	if err != nil {
+		// 		return nil, loginEvent, err
+		// 	}
+		// 	tweets := SimplifyTweetResult(result)
+		// 	logWithPrefix("[%s] only-read-cache, return newly %d", query, len(tweets))
+		// 	return tweets, loginEvent, err
+		// }
 		return []*SimpleTweetResult{}, nil, nil
 	} else {
 		return c.fetch(query, c.fetchMaxPerTask, false)
@@ -243,7 +246,7 @@ func (c *TwitterCacher) GetTweets(query string, count int) ([]*SimpleTweetResult
 	// }
 }
 
-func (c *TwitterCacher) fetch(query string, max int, preappendAll bool) ([]*SimpleTweetResult, *data_types.LoginEvent, error) {
+func (c *TwitterCacher) fetch(query string, max int, most bool) ([]*SimpleTweetResult, *data_types.LoginEvent, error) {
 	logWithPrefix("[%s] advanced fetch: %d", query, max)
 	updateCache := true
 	existingTweets, err := c.getCacheTweets(query)
@@ -302,7 +305,7 @@ func (c *TwitterCacher) fetch(query string, max int, preappendAll bool) ([]*Simp
 			} else {
 				allTweets = append(allTweets, latestTweets...)
 			}
-			if !preappendAll && accumulated >= max {
+			if !most && accumulated >= max {
 				// 允许漏掉一些
 				break
 			}
@@ -349,7 +352,7 @@ func (c *TwitterCacher) fetch(query string, max int, preappendAll bool) ([]*Simp
 		return finalTweets
 	}
 
-	if accumulated >= max {
+	if !most && accumulated >= max {
 		logWithPrefix("[%s] accumulated %d, no need to append more", query, accumulated)
 		return finalProcess(allTweets, yesterday), nil, nil
 	}
@@ -371,11 +374,15 @@ func (c *TwitterCacher) fetch(query string, max int, preappendAll bool) ([]*Simp
 	}
 	if cursor != CURSOR_END {
 		for {
-			logWithPrefix("[%s] get %d, cursor: %s", query, min(1000, max-accumulated), cursor)
+			logWithPrefix("[%s] get %d, cursor: %s", query, max-accumulated, cursor)
 			var result []*TweetResult
-			result, _, cursor, err = ScrapeTweetsByQueryByAccountsRound(query, min(1000, max-accumulated), cursor)
+			result, _, cursor, err = ScrapeTweetsByQueryByAccountsRound(query, max-accumulated, cursor)
 			if err != nil {
 				logErrorWithPrefix("[%s] scrape error: %v", query, err)
+				break
+			}
+			if len(result) <= 0 {
+				logErrorWithPrefix("[%s] result: %d", query, len(result))
 				break
 			}
 			tweets := SimplifyTweetResult(result)
@@ -509,9 +516,15 @@ func (c *TwitterCacher) getKeywords() []string {
 			logErrorWithPrefix("fetch trending failed: %v", err)
 			return keywords
 		}
-		for _, tq := range trendingQueries[:TRENDING_COUNT] {
-			// strip in py
-			keywords = append(keywords, fmt.Sprintf("\"%s\"", strings.TrimSpace(tq)))
+		if len(trendingQueries) >= TRENDING_COUNT {
+			for _, tq := range trendingQueries[:TRENDING_COUNT] {
+				// strip in py
+				keywords = append(keywords, fmt.Sprintf("\"%s\"", strings.TrimSpace(tq)))
+			}
+		} else {
+			for _, tq := range trendingQueries {
+				keywords = append(keywords, fmt.Sprintf("\"%s\"", strings.TrimSpace(tq)))
+			}
 		}
 	}
 	return keywords

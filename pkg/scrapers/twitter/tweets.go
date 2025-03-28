@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	twitterscraper "github.com/imperatrona/twitter-scraper"
@@ -139,13 +140,17 @@ func ScrapeTweetsByQueryByAccountsRound(query string, count int, cursor string) 
 	i := 0
 	for {
 		i++
-		logrus.Infof("i %d total accounts %d", i, totalAccounts)
 		if i > totalAccounts {
-			return nil, nil, cursor, errors.Errorf("all accounts fail to fetch")
+			// TODO: 不懂为啥会出现这种情况
+			logrus.Errorf("run up %d accounts", totalAccounts)
+			break
 		}
 		scraper, account, _, err := getAuthenticatedScraper()
 		if err != nil {
-			logrus.Error(err)
+			if strings.Contains(err.Error(), "all accounts are rate-limited") {
+				return nil, nil, cursor, err
+			}
+			logrus.Errorf("get scraper %v", err)
 			continue
 		}
 

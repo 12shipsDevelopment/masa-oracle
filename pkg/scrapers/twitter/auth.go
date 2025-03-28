@@ -21,6 +21,7 @@ func NewScraper(account *TwitterAccount, cookieDir string) (*Scraper, *data_type
 		if scraper.IsLoggedIn() {
 			logrus.Debugf("Already logged in as %s.", account.Username)
 			// Log a successful login event
+			scraper.SetUsername(account.Username)
 			loginEvent = data_types.NewLoginEvent("", account.Username, "Twitter", true, "")
 			return scraper, loginEvent
 		}

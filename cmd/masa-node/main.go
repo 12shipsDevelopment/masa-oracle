@@ -89,6 +89,7 @@ func main() {
 			cfg.FetchPreappend,
 		)
 		go twitterCacher.Start(ctx)
+		go twitterCacher.Clear(ctx)
 	}
 	masaNodeOptions, workHandlerManager, pubKeySub := initOptions(cfg, twitterCacher)
 	// Create a new OracleNode

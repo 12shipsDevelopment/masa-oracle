@@ -96,6 +96,55 @@ func NewTwitterCacher(
 	return &cache
 }
 
+func (c *TwitterCacher) Clear(ctx context.Context) {
+	if !c.onlyReadCache {
+		for {
+			logWithPrefix("twitter expiration cleaner started")
+			start := time.Now()
+
+			iter := c.rdb.Scan(ctx, 0, "*", 0).Iterator()
+			for iter.Next(ctx) {
+				key := iter.Val()
+				if !strings.HasSuffix(key, "-meta") {
+					lock := c.getLock(key)
+					if lock.TryLock() {
+						tweets, _ := c.getCacheTweets(key)
+						if len(tweets) > 0 {
+							newTweets := removeExpire(tweets, yesterday())
+							if len(newTweets) < len(tweets) {
+								if len(newTweets) <= 0 {
+									_, err := c.rdb.Del(ctx, key).Result()
+									if err == nil {
+										logrus.Infof("[%s] del", key)
+									}
+									_, err = c.rdb.Del(ctx, c.metaKey(key)).Result()
+									if err == nil {
+										logrus.Infof("[%s] del", c.metaKey(key))
+									}
+								} else {
+									if err := c.cacheTweets(key, newTweets); err == nil {
+										logrus.Infof("[%s] rm %d expired", key, len(tweets)-len(newTweets))
+									}
+								}
+							}
+						}
+						lock.Unlock()
+					}
+				}
+			}
+			elapsed := time.Since(start)
+			logWithPrefix("expiration clean takes: %s\n", elapsed)
+
+			select {
+			case <-time.After(12 * time.Hour):
+			case <-ctx.Done():
+				logWithPrefix("twitter expiration cleaner stopped")
+				return
+			}
+		}
+	}
+}
+
 func (c *TwitterCacher) Start(ctx context.Context) {
 	logWithPrefix("twitter cacher started")
 
@@ -187,7 +236,11 @@ func removeDuplicates(array []*SimpleTweetResult) []*SimpleTweetResult {
 }
 
 func removeExpire(array []*SimpleTweetResult, deadline int64) []*SimpleTweetResult {
+	if array[0].Tweet.Timestamp <= deadline {
+		return []*SimpleTweetResult{}
+	}
 	for i := len(array) - 1; i >= 0; i-- {
+		logrus.Infof("%d %d", array[i].Tweet.Timestamp, deadline)
 		if array[i].Tweet.Timestamp > deadline {
 			logWithPrefix("remove expired: %d", len(array)-1-i)
 			return array[:i+1]
@@ -374,9 +427,9 @@ func (c *TwitterCacher) fetch(query string, max int, most bool) ([]*SimpleTweetR
 	}
 	if cursor != CURSOR_END {
 		for {
-			logWithPrefix("[%s] get %d, cursor: %s", query, max-accumulated, cursor)
+			logWithPrefix("[%s] get %d, cursor: %s", query, min(1000, max-accumulated), cursor)
 			var result []*TweetResult
-			result, _, cursor, err = ScrapeTweetsByQueryByAccountsRound(query, max-accumulated, cursor)
+			result, _, cursor, err = ScrapeTweetsByQueryByAccountsRound(query, min(1000, max-accumulated), cursor)
 			if err != nil {
 				logErrorWithPrefix("[%s] scrape error: %v", query, err)
 				break

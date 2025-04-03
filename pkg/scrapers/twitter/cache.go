@@ -44,16 +44,18 @@ type TwitterCacher struct {
 
 	rdb *redis.Client
 
-	onlyReadCache   bool
-	fetchInterval   int
-	fetchMaxPerTask int
-	fetchPerRound   int
-	fetchPreappend  int
+	onlyReadCache    bool
+	clearExpireCache bool
+	fetchInterval    int
+	fetchMaxPerTask  int
+	fetchPerRound    int
+	fetchPreappend   int
 }
 
 func NewTwitterCacher(
 	rdb *redis.Client,
 	onlyReadCache bool,
+	clearExpireCache bool,
 	fetch_interval int,
 	fetch_max_per_task int,
 	fetch_per_round int,
@@ -83,21 +85,22 @@ func NewTwitterCacher(
 		fetchPreappend,
 	)
 	cache := TwitterCacher{
-		httpClient:      httpClient,
-		lockMap:         make(map[string]*sync.Mutex),
-		allTrendings:    make(map[string]bool),
-		rdb:             rdb,
-		onlyReadCache:   onlyReadCache,
-		fetchInterval:   fetchInterval,
-		fetchMaxPerTask: fetchMaxPerTask,
-		fetchPerRound:   fetchPerRound,
-		fetchPreappend:  fetchPreappend,
+		httpClient:       httpClient,
+		lockMap:          make(map[string]*sync.Mutex),
+		allTrendings:     make(map[string]bool),
+		rdb:              rdb,
+		onlyReadCache:    onlyReadCache,
+		clearExpireCache: clearExpireCache,
+		fetchInterval:    fetchInterval,
+		fetchMaxPerTask:  fetchMaxPerTask,
+		fetchPerRound:    fetchPerRound,
+		fetchPreappend:   fetchPreappend,
 	}
 	return &cache
 }
 
 func (c *TwitterCacher) Clear(ctx context.Context) {
-	if !c.onlyReadCache {
+	if c.clearExpireCache {
 		for {
 			logWithPrefix("twitter expiration cleaner started")
 			start := time.Now()
@@ -556,8 +559,8 @@ const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const BEARER_TOKEN = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 
 func (c *TwitterCacher) getKeywords() []string {
-	// keywords := []string{"\"crypto\"", "\"btc\"", "\"eth\""}
-	keywords := []string{}
+	keywords := []string{"\"crypto\"", "\"btc\"", "\"eth\""}
+	// keywords := []string{}
 
 	guestToken, err := c.getGuestToken()
 	if err != nil {

@@ -83,6 +83,7 @@ func main() {
 		})
 		twitterCacher = twitter.NewTwitterCacher(rdb,
 			cfg.OnlyReadCache,
+			cfg.ClearExpireCache,
 			cfg.FetchInterval,
 			cfg.FetchMaxPerTask,
 			cfg.FetchPerRound,
